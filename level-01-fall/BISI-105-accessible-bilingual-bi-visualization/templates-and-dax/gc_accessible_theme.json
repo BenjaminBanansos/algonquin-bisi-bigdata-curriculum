@@ -1,0 +1,31 @@
+{
+  "name": "Government of Canada Accessible WCAG 2.1 AA Theme",
+  "dataColors": [
+    "#004F6E",
+    "#A61C1C",
+    "#2E7D32",
+    "#D97706",
+    "#4B2E83",
+    "#0072CE",
+    "#8C564B",
+    "#333333"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#242424",
+  "tableAccent": "#004F6E",
+  "visualStyles": {
+    "*": {
+      "*": {
+        "outspace": [{ "color": { "solid": { "color": "#F5F5F5" } } }],
+        "title": [
+          {
+            "show": true,
+            "fontColor": { "solid": { "color": "#111111" } },
+            "fontSize": 14,
+            "fontFamily": "Segoe UI, Arial, sans-serif"
+          }
+        ]
+      }
+    }
+  }
+}

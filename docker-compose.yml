@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. Spark Master & PySpark JupyterLab Environment
+  # =========================================================================
+  spark-master:
+    image: apache/spark:3.5.1
+    container_name: bisi-spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "8081:8080" # Spark Web UI
+      - "7077:7077" # Spark Master port
+    volumes:
+      - ./data:/opt/spark/work-dir/data
+      - ./level-01-fall:/opt/spark/work-dir/level-01-fall
+      - ./level-02-winter:/opt/spark/work-dir/level-02-winter
+
+  spark-worker-1:
+    image: apache/spark:3.5.1
+    container_name: bisi-spark-worker-1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    volumes:
+      - ./data:/opt/spark/work-dir/data
+
+  jupyter-pyspark:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: bisi-jupyter
+    environment:
+      - JUPYTER_TOKEN=bisi2026
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./:/home/jovyan/work
+    depends_on:
+      - spark-master
+
+  # =========================================================================
+  # 2. Relational Analytics Database (PostgreSQL 16)
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: bisi-postgres
+    environment:
+      POSTGRES_USER: bisi_admin
+      POSTGRES_PASSWORD: GovPassword2026!
+      POSTGRES_DB: public_sector_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./level-01-fall/BISI-102-enterprise-database-analytics-sql/labs:/docker-entrypoint-initdb.d
+
+  # =========================================================================
+  # 3. Apache Kafka & Zookeeper (Real-Time Telemetry & Event Streaming)
+  # =========================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: bisi-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: bisi-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+  # =========================================================================
+  # 4. MinIO S3-Compatible Storage (Simulating Cloud Lakehouse Storage)
+  # =========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: bisi-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_gov_admin
+      MINIO_ROOT_PASSWORD: MinioSecurePassword2026!
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./minio-data:/data
+
+  # =========================================================================
+  # 5. Apache Airflow (Pipeline Orchestration)
+  # =========================================================================
+  airflow-standalone:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: bisi-airflow
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__WEBSERVER__EXPOSE_CONFIG=True
+      - _AIRFLOW_DB_UPGRADE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    command: standalone
+    volumes:
+      - ./level-01-fall/BISI-106-data-engineering-lakehouse-dbt-airflow/airflow-dags:/opt/airflow/dags
+      - ./data:/opt/airflow/data

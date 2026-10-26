@@ -1,0 +1,63 @@
+// =========================================================================
+// BISI-105: Dynamic Bilingual DAX Measure Library (Official Languages Compliant)
+// Standard: Government of Canada English / French Functional Equivalence
+// =========================================================================
+
+// 1. Selected Language Parameter Harvest
+Selected_Language = 
+SELECTEDVALUE('Language_Selector'[Language_Code], "EN")
+
+// 2. Dynamic KPI Label for Total Expenditure
+Label_Total_Expenditure = 
+IF(
+    [Selected_Language] = "FR",
+    "Dépenses Totales de l'Exercice (CAD)",
+    "Total Fiscal Year Expenditure (CAD)"
+)
+
+// 3. Dynamic KPI Value with Localized Number Formatting
+Formatted_Total_Expenditure = 
+VAR TotalAmount = SUM('Fact_Expenditures'[Expenditure_Amount])
+RETURN
+IF(
+    [Selected_Language] = "FR",
+    // French spacing and comma decimal convention
+    FORMAT(TotalAmount, "#,##0.00 $", "fr-CA"),
+    // English currency formatting
+    FORMAT(TotalAmount, "$#,##0.00", "en-CA")
+)
+
+// 4. Federal Fiscal Year-to-Date (FY-YTD) Calculation
+// Note: Canadian Federal Fiscal Year starts April 1st
+Fiscal_YTD_Expenditure = 
+CALCULATE(
+    SUM('Fact_Expenditures'[Expenditure_Amount]),
+    DATESYTD('Dim_Date'[Date], "03-31")
+)
+
+// 5. Prior Year Comparison and Variance
+Prior_Fiscal_YTD_Expenditure = 
+CALCULATE(
+    [Fiscal_YTD_Expenditure],
+    SAMEPERIODLASTYEAR('Dim_Date'[Date])
+)
+
+YoY_Growth_Percentage = 
+DIVIDE(
+    [Fiscal_YTD_Expenditure] - [Prior_Fiscal_YTD_Expenditure],
+    [Prior_Fiscal_YTD_Expenditure],
+    0.0
+)
+
+// 6. Dynamic Accessible Screen Reader Narrative (Alt-Text)
+Screen_Reader_Summary_Narrative = 
+VAR GrowthRate = [YoY_Growth_Percentage] * 100
+VAR TotalExp = [Formatted_Total_Expenditure]
+RETURN
+IF(
+    [Selected_Language] = "FR",
+    "Résumé exécutif : Les dépenses cumulées pour l'exercice financier sont de " & TotalExp & 
+    ", ce qui représente une variation de " & FORMAT(GrowthRate, "0.0") & " pour cent par rapport à la même période de l'année précédente.",
+    "Executive Summary: Fiscal year expenditures to date are " & TotalExp & 
+    ", reflecting a year-over-year change of " & FORMAT(GrowthRate, "0.0") & " percent compared to the prior fiscal cycle."
+)
